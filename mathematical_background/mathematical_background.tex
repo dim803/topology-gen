@@ -1,0 +1,195 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+\newtheorem{corollary}{Corollary}
+
+\title{Mathematical Background: Topology Generator from a Subbasis}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Scope}
+
+$X$ is a fixed finite set throughout. This document covers: generating a topology from a
+subbasis (\texttt{generator.py}); topology validation (\texttt{validate.py}); separation
+axioms $T_0$--$T_4$ (\texttt{separation.py}); connectedness
+(\texttt{connectedness.py}); compactness (\texttt{compactness.py}); and continuity
+(\texttt{continuity.py}).
+
+\section{Topologies, Bases, Subbases}
+
+\begin{definition}
+A \emph{topology} on $X$ is $\mathcal T \subseteq \mathcal P(X)$ with
+$\emptyset, X \in \mathcal T$, closed under arbitrary unions and finite intersections.
+\end{definition}
+
+\begin{definition}
+A \emph{basis} $\mathcal B$ generates $\mathcal T = \{\bigcup \mathcal U : \mathcal U
+\subseteq \mathcal B\}$. A \emph{subbasis} $\mathcal S$ generates the basis
+$\mathcal B = \{\bigcap \mathcal F : \mathcal F \subseteq \mathcal S,\ |\mathcal F| <
+\infty\} \cup \{X\}$ (the empty intersection is $X$), and hence $\mathcal T$.
+\end{definition}
+
+Since $X$ is finite, $\mathcal P(X)$ is finite, so ``arbitrary union'' and ``finite union''
+coincide, and every finite intersection is reachable by intersecting one subbasis element
+at a time. \texttt{generate\_basis\_from\_subbasis} computes $\mathcal B$ by closing
+$\{X\}$ under pairwise intersection with each $s \in \mathcal S$ to a fixed point;
+\texttt{generate\_topology\_from\_basis} closes $\{\emptyset\}\cup\mathcal B$ under
+pairwise union with each $b \in \mathcal B$ the same way. Both terminate since
+$\mathcal P(X)$ is finite and each step either adds a new set or reaches the fixed point.
+
+\begin{proposition}
+For finite $X$, checking $\mathcal T$ closed under \emph{pairwise} union/intersection of
+its own members is equivalent to closure under arbitrary unions and finite intersections.
+\end{proposition}
+\begin{proof}
+Any union (intersection) of a subset of $\mathcal T$ is built by repeatedly combining two
+elements at a time; if $\mathcal T$ is closed under each such step, by induction on
+$|\mathcal T|<\infty$ it is closed under the full operation.
+\end{proof}
+
+This is what \texttt{is\_topology} checks directly, with a counterexample pair returned on
+failure.
+
+\section{Separation Axioms}
+
+For distinct $x,y\in X$:
+
+\begin{center}
+\begin{tabular}{ll}
+$T_0$ & some open set contains exactly one of $x,y$ \\
+$T_1$ & some open set contains $x$ not $y$, and some open set contains $y$ not $x$ \\
+$T_2$ & disjoint open sets separate $x$ and $y$ \\
+\end{tabular}
+\end{center}
+
+\begin{proposition}
+$T_1 \iff$ every singleton is closed.
+\end{proposition}
+\begin{proof}
+($\Rightarrow$) For fixed $x$, $X\setminus\{x\} = \bigcup_{y\ne x} U_y$ where $U_y$ is open,
+contains $y$, excludes $x$ (exists by $T_1$); a union of opens is open, so
+$X\setminus\{x\}$ is open, i.e.\ $\{x\}$ is closed.
+($\Leftarrow$) If every singleton is closed, $X\setminus\{y\}$ is an open set containing
+$x$ but not $y$, and symmetrically for $X\setminus\{x\}$.
+\end{proof}
+
+\texttt{check\_T1\_via\_closed\_singletons} implements the right-hand side independently,
+as a cross-check on \texttt{check\_T1}.
+
+\begin{definition}[Munkres]
+$X$ is \emph{regular} if for every closed $C$ and $x\notin C$, disjoint open sets separate
+$\{x\}$ and $C$; \emph{normal} if every pair of disjoint closed sets is so separated.
+$T_3 = \text{regular} \wedge T_1$; $T_4 = \text{normal}\wedge T_1$.
+\end{definition}
+
+\begin{theorem}
+\label{thm:finite-t1-discrete}
+Every finite $T_1$ space is discrete.
+\end{theorem}
+\begin{proof}
+By the Proposition above, $T_1$ makes every singleton closed. $X$ finite $\Rightarrow$
+every subset $A\subseteq X$ is a finite union of singletons, $A = \bigcup_{a\in A}\{a\}$;
+each $X\setminus\{a\}$ is open (singletons closed), and $A = \bigcap_{a\notin A}
+(X\setminus\{a\})$ is a finite intersection of opens, hence open. So every subset is open:
+$\mathcal T = \mathcal P(X)$.
+\end{proof}
+
+\begin{corollary}
+\label{cor:all-coincide}
+On a finite space, $T_1 \iff T_2 \iff T_3 \iff T_4 \iff$ discrete.
+\end{corollary}
+\begin{proof}
+$T_2\Rightarrow T_1$ always (fewer conditions). $T_1\Rightarrow$ discrete
+(Theorem~\ref{thm:finite-t1-discrete}). Discrete $\Rightarrow T_2$ (singletons separate any
+two points) $\Rightarrow$ discrete is regular and normal trivially (any two disjoint sets
+are already separated by themselves, both open), so discrete $\wedge\, T_1 \Rightarrow
+T_3, T_4$. $T_3, T_4 \Rightarrow T_1$ by definition. All five are therefore equivalent.
+\end{proof}
+
+Checked computationally across 500 random finite topologies in
+\texttt{test\_t1\_t2\_t3\_t4\_and\_discrete\_all\_coincide\_on\_finite\_spaces}: for every
+generated topology, \texttt{is\_T1 == is\_T2 == is\_T3 == is\_T4 == is\_discrete}.
+
+\section{Connectedness}
+
+\begin{definition}
+$A\subseteq X$ is \emph{clopen} if $A$ and $X\setminus A$ are both open. $X$ is
+\emph{connected} if its only clopen subsets are $\emptyset, X$.
+\end{definition}
+
+\begin{proposition}
+The clopen subsets of a finite space form a Boolean algebra under $\cap,\cup,{}^c$, and for
+$x\in X$, $\mathrm{comp}(x) := \bigcap\{C \text{ clopen} : x\in C\}$ is the connected
+component of $x$.
+\end{proposition}
+\begin{proof}[Proof sketch]
+Closure of clopen sets under $\cap,\cup,{}^c$ is immediate from the definition of a
+topology. $\mathrm{comp}(x)$ is a finite intersection of clopen sets, hence clopen, and by
+minimality no proper nonempty clopen subset of $\mathrm{comp}(x)$ can separate it further;
+distinct $\mathrm{comp}(x)$'s are disjoint or equal since their intersection, if nonempty,
+would itself be a smaller clopen set containing both would-be centers, contradicting
+minimality unless they coincide.
+\end{proof}
+
+\texttt{connected\_components} computes $\mathrm{comp}(x)$ for each $x$ directly from this
+characterization. The discrete topology: every singleton is clopen, so each
+$\mathrm{comp}(x)=\{x\}$ ($n$ components). The indiscrete topology: only clopen sets are
+$\emptyset,X$, so one component. The Sierpi\'nski space $(\{0,1\},
+\{\emptyset,\{0\},\{0,1\}\})$: $\{0\}$ is open but $\{1\}$ (its complement) is not, so
+$\{0\}$ is not clopen; the only clopen sets are $\emptyset, X$, so it is connected despite
+not being $T_1$.
+
+\section{Compactness}
+
+\begin{definition}
+$X$ is \emph{compact} if every open cover has a finite subcover.
+\end{definition}
+
+\begin{proposition}
+Every finite topological space is compact.
+\end{proposition}
+\begin{proof}
+$\mathcal T \subseteq \mathcal P(X)$ and $X$ finite $\Rightarrow |\mathcal T| \le
+2^{|X|} < \infty$. Any open cover is a subset of $\mathcal T$, hence itself finite, hence
+trivially its own finite subcover.
+\end{proof}
+
+\texttt{is\_compact} verifies this by constructing an explicit finite subcover via greedy
+set cover (\texttt{has\_finite\_subcover}) rather than returning a hardcoded constant — the
+content here is the proof that this is always possible, not the search itself.
+
+\section{Continuity}
+
+\begin{definition}
+$f: (X,\mathcal T_X) \to (Y,\mathcal T_Y)$ is \emph{continuous} if $f^{-1}(V) \in
+\mathcal T_X$ for every $V \in \mathcal T_Y$. A \emph{homeomorphism} is a continuous
+bijection with continuous inverse.
+\end{definition}
+
+\begin{proposition}
+If $\mathcal T_X$ is finer than $\mathcal T_X'$ (i.e.\ $\mathcal T_X' \subseteq
+\mathcal T_X$), then $\mathrm{id}: (X,\mathcal T_X)\to(X,\mathcal T_X')$ is continuous.
+\end{proposition}
+\begin{proof}
+$\mathrm{id}^{-1}(V) = V$ for every $V\in\mathcal T_X'\subseteq \mathcal T_X$.
+\end{proof}
+
+In particular $\mathrm{id}: \text{discrete} \to \text{any topology}$ is always continuous
+(discrete is finest), and $\mathrm{id}:\text{any topology}\to\text{discrete}$ is continuous
+only if the source is already discrete — confirmed directly:
+\texttt{indiscrete}$\to$\texttt{discrete} fails, with a witnessing non-open preimage
+returned by \texttt{is\_continuous}. A constant map is continuous regardless of
+$\mathcal T_X$, since $f^{-1}(V) \in \{\emptyset, X\}$ for every $V$, and both are always
+open. \texttt{is\_homeomorphism} checks $f,f^{-1}$ are genuine mutual-inverse bijections
+before checking continuity in both directions.
+
+\end{document}
